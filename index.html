@@ -51,10 +51,14 @@
   .stat { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 8px; text-align: center; }
   .stat-val { font-size: 22px; font-weight: 700; color: var(--green); }
   .stat-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: .03em; }
-  .filter-bar { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
+  .filter-bar { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; }
   .filter-bar::-webkit-scrollbar { display: none; }
   .chip { flex-shrink: 0; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; border: 1.5px solid var(--border); background: var(--card); color: var(--text2); cursor: pointer; white-space: nowrap; transition: all .15s; }
   .chip.active { background: var(--green); color: #fff; border-color: var(--green); }
+  .player-filter-bar { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
+  .player-filter-bar::-webkit-scrollbar { display: none; }
+  .pchip { flex-shrink: 0; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border); background: var(--card); color: var(--text2); cursor: pointer; white-space: nowrap; transition: all .15s; }
+  .pchip.active { background: #185FA5; color: #fff; border-color: #185FA5; }
   .game-item { background: var(--card); border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
   .game-item.is-next { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(212,117,10,.15); }
   .game-header { display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 11px; gap: 6px; flex-wrap: wrap; }
@@ -161,6 +165,7 @@
   <div id="view-jogos" class="view">
     <div class="stats-grid" id="sgrid"></div>
     <div class="filter-bar" id="filter-bar"></div>
+    <div class="player-filter-bar" id="player-filter-bar"></div>
     <div id="jogos-list"></div>
   </div>
   <div id="view-tabela" class="view">
@@ -206,6 +211,7 @@ const DEF=['ET','IK','GayGago','DesBeats','BossMyk','CotaZé','Pacha'];
 let names=[...DEF];
 let matches=[];
 let activeFilter='all';
+let activePlayer=-1; // -1 = todos
 
 async function init(){
   setSyncState('syncing');
@@ -231,7 +237,7 @@ async function syncData(){
     if(pRows&&pRows.length===7) names=pRows.map(p=>p.name);
     setSyncState('online'); updateHeader();
     const av=document.querySelector('.view.active').id.replace('view-','');
-    if(av==='jogos'){renderStats();renderJogos();}
+    if(av==='jogos'){renderStats();renderFilters();renderJogos();}
     if(av==='tabela') renderTabela();
   }catch(e){setSyncState('offline');}
 }
@@ -307,17 +313,29 @@ function renderFilters(){
   document.getElementById('filter-bar').innerHTML=filters.map(f=>
     `<button class="chip${activeFilter===f.k?' active':''}" onclick="setFilter('${f.k}')">${f.l}</button>`
   ).join('');
+  renderPlayerFilter();
 }
+function renderPlayerFilter(){
+  document.getElementById('player-filter-bar').innerHTML=
+    `<button class="pchip${activePlayer===-1?' active':''}" onclick="setPlayer(-1)">👥 Todos</button>`+
+    names.map((n,i)=>`<button class="pchip${activePlayer===i?' active':''}" onclick="setPlayer(${i})">${n}</button>`).join('');
+}
+function setPlayer(i){activePlayer=i;renderPlayerFilter();renderJogos();}
 function setFilter(f){activeFilter=f;renderFilters();renderJogos();}
 
 function renderJogos(){
   const el=document.getElementById('jogos-list');
+  if(!matches||!matches.length){
+    el.innerHTML='<div class="empty"><span class="empty-icon">⚽</span>A carregar jogos...</div>';
+    return;
+  }
   const nextIdx=matches.findIndex(m=>m.score_a===null);
-  let list=matches.map((m,i)=>({...m,idx:i}));
+  let list=matches.map((m,i)=>({...m,idx:i,teamA:Array.isArray(m.teamA)?m.teamA:JSON.parse(m.teamA),teamB:Array.isArray(m.teamB)?m.teamB:JSON.parse(m.teamB)}));
   if(activeFilter==='pending') list=list.filter(m=>m.score_a===null);
   else if(activeFilter==='done') list=list.filter(m=>m.score_a!==null);
-  else if(activeFilter==='next'){const ni=matches.findIndex(m=>m.score_a===null);list=ni>=0?[{...matches[ni],idx:ni}]:[]; }
-  if(!list.length){el.innerHTML=`<div class="empty"><span class="empty-icon">🎉</span>${activeFilter==='next'?'Todos os jogos concluídos!':'Nenhum jogo encontrado.'}</div>`;return;}
+  else if(activeFilter==='next'){const ni=matches.findIndex(m=>m.score_a===null);list=ni>=0?[{...matches[ni],idx:ni,teamA:Array.isArray(matches[ni].teamA)?matches[ni].teamA:JSON.parse(matches[ni].teamA),teamB:Array.isArray(matches[ni].teamB)?matches[ni].teamB:JSON.parse(matches[ni].teamB)}]:[]; }
+  if(activePlayer!==-1) list=list.filter(m=>[...m.teamA,...m.teamB].includes(activePlayer));
+  if(!list.length){el.innerHTML=`<div class="empty"><span class="empty-icon">🔍</span>Nenhum jogo encontrado.</div>`;return;}
   el.innerHTML=list.map(m=>renderGameItem(m,nextIdx)).join('');
 }
 
