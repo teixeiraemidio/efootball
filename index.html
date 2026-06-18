@@ -182,29 +182,29 @@ async function dbUpsert(t,d){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}`,
 async function dbUpdate(t,match,d){const p=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join('&');const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?${p||'seq=gte.0'}`,{method:'PATCH',headers:H,body:JSON.stringify(d)});return r.ok;}
 async function dbDelete(t,p){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?${p}`,{method:'DELETE',headers:H});return r.ok;}
 
-// Mathematically verified schedule: 21 games, each pair partners exactly 2x, 12 games per player, no consecutive byes
+// Verified schedule: 21 games, 6 home + 6 away per player, 12 games per player, repeat partnerships delayed to after jogo 9+
 const SCHEDULE=[
   {teamA:[0,1],teamB:[2,3],bye:4},
-  {teamA:[0,1],teamB:[2,4],bye:3},
   {teamA:[0,2],teamB:[1,3],bye:5},
-  {teamA:[0,2],teamB:[1,4],bye:6},
   {teamA:[0,3],teamB:[1,2],bye:4},
-  {teamA:[0,3],teamB:[1,4],bye:2},
+  {teamA:[1,6],teamB:[0,5],bye:2},
+  {teamA:[1,5],teamB:[0,6],bye:3},
+  {teamA:[4,6],teamB:[2,5],bye:0},
+  {teamA:[2,4],teamB:[5,6],bye:1},
+  {teamA:[3,5],teamB:[2,6],bye:0},
+  {teamA:[0,2],teamB:[1,4],bye:6},
   {teamA:[0,4],teamB:[1,2],bye:3},
-  {teamA:[0,4],teamB:[1,3],bye:2},
-  {teamA:[0,5],teamB:[2,3],bye:1},
-  {teamA:[0,5],teamB:[1,6],bye:2},
-  {teamA:[0,6],teamB:[1,5],bye:3},
-  {teamA:[0,6],teamB:[2,5],bye:1},
+  {teamA:[3,6],teamB:[4,5],bye:0},
+  {teamA:[2,5],teamB:[0,6],bye:1},
+  {teamA:[1,6],teamB:[3,4],bye:5},
+  {teamA:[2,4],teamB:[0,1],bye:3},
+  {teamA:[0,3],teamB:[1,4],bye:2},
+  {teamA:[2,3],teamB:[0,5],bye:1},
+  {teamA:[1,3],teamB:[0,4],bye:2},
   {teamA:[1,5],teamB:[3,6],bye:0},
-  {teamA:[2,5],teamB:[4,6],bye:1},
-  {teamA:[1,6],teamB:[3,4],bye:0},
-  {teamA:[2,6],teamB:[3,5],bye:4},
-  {teamA:[2,4],teamB:[5,6],bye:0},
-  {teamA:[3,4],teamB:[5,6],bye:1},
-  {teamA:[2,6],teamB:[4,5],bye:0},
-  {teamA:[3,5],teamB:[4,6],bye:2},
-  {teamA:[3,6],teamB:[4,5],bye:0}
+  {teamA:[4,5],teamB:[2,6],bye:1},
+  {teamA:[5,6],teamB:[3,4],bye:0},
+  {teamA:[4,6],teamB:[3,5],bye:2}
 ];
 
 const DEF=['ET','IK','GayGago','DesBeats','BossMyk','CotaZé','Pacha'];
@@ -221,6 +221,8 @@ async function init(){
     if(mRows&&mRows.length===21){
       matches=mRows.map(m=>({...m,teamA:JSON.parse(m.team_a),teamB:JSON.parse(m.team_b)}));
     } else {
+      // Wrong number of matches (old 42-game schedule or empty) — force regenerate
+      await dbDelete('matches','seq=gte.0');
       await generateSchedule();
     }
     setSyncState('online');
